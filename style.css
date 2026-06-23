@@ -816,6 +816,9 @@ body {
   background: #fce8ee;
   border-color: var(--rose);
 }
+.ix-note-block {
+  width: 100%;
+}
 .ix-note {
   width: 100%;
   max-width: 100%;
@@ -828,8 +831,8 @@ body {
   color: var(--ink);
   background: #fff;
   resize: vertical;
-  min-height: 3.2rem;
-  text-align: center;
+  min-height: 4rem;
+  text-align: left;
 }
 .ix-msg {
   font-size: 0.65rem;

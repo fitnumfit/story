@@ -28,21 +28,23 @@ export default async function handler(req, res) {
     }
   }
 
-  const { event, sessionId, clientTime, timeZone, data = {}, meta = {} } = body || {};
+  const { event, sessionId, userId, clientTime, timeZone, data = {}, meta = {} } = body || {};
   if (!event || !ALLOWED_EVENTS.has(event)) {
     return res.status(400).json({ ok: false, error: "Invalid or missing event" });
   }
   if (!sessionId) return res.status(400).json({ ok: false, error: "Missing sessionId" });
 
   const times = formatTimes(clientTime, timeZone);
+  const enrichedMeta = { ...meta, userId: userId || meta.userId || "anonymous" };
 
   try {
     const blob = await saveEventToBlob({
       event,
       sessionId,
+      userId: enrichedMeta.userId,
       times,
       data,
-      meta,
+      meta: enrichedMeta,
     });
     return res.status(200).json({ ok: true, event, time: times, ...blob });
   } catch (err) {

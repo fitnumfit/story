@@ -2,6 +2,7 @@ const CONTENT_URL = "content.json";
 const TRACK_API = "/api/track";
 const TURN_MS = 1000;
 const SESSION_KEY = "bookSession";
+const USER_KEY = "bookUserId";
 const LINK_TRACKED_KEY = "bookLinkTracked";
 const BOOK_SCALE_KEY = "bookScale";
 const BOOK_SCALE_MIN = 0.85;
@@ -16,6 +17,15 @@ function getSessionId() {
   if (!id) {
     id = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     sessionStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+}
+
+function getUserId() {
+  let id = localStorage.getItem(USER_KEY);
+  if (!id) {
+    id = `user_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(USER_KEY, id);
   }
   return id;
 }
@@ -39,22 +49,38 @@ function pageMeta() {
   };
 }
 
+function userSnapshot() {
+  return {
+    accepted: herResponse.accepted,
+    smile: herResponse.smile,
+    note: herResponse.note,
+  };
+}
+
+const USER_RESPONSE_EVENTS = new Set(["accept_apology", "smile", "note"]);
+
 async function trackEvent(event, data = {}) {
   try {
+    const meta = {
+      referrer: document.referrer || "direct",
+      userAgent: navigator.userAgent,
+      ...pageMeta(),
+    };
+    if (USER_RESPONSE_EVENTS.has(event)) {
+      meta.userSnapshot = userSnapshot();
+    }
+
     const res = await fetch(TRACK_API, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         event,
         sessionId: getSessionId(),
+        userId: getUserId(),
         clientTime: new Date().toISOString(),
         timeZone: getTimeZone(),
         data,
-        meta: {
-          referrer: document.referrer || "direct",
-          userAgent: navigator.userAgent,
-          ...pageMeta(),
-        },
+        meta,
       }),
     });
     const json = await res.json().catch(() => ({}));
@@ -226,10 +252,20 @@ function scheduleBookLayout() {
 
 const herResponse = { accepted: false, smile: "", note: "" };
 
+function isAfterChapter10(page) {
+  if (!page) return false;
+  if (page.type === "chapter-story" && page.number >= CHAPTERS.length) return true;
+  return ["finale", "interactive", "story-continue"].includes(page.type);
+}
+
 function showTurnHint(page, side) {
-  if (side === "right") return turnHintHtml();
-  if (page.type === "chapter-story" && page.number === CHAPTERS.length) return turnHintHtml();
-  return "";
+  if (!page || isAfterChapter10(page)) return "";
+  if (side !== "right") return "";
+  return turnHintHtml();
+}
+
+function isPostChapter10Left() {
+  return isAfterChapter10(PAGES[spread]);
 }
 function blankPaper(side) {
   return `<div class="pg pg--paper-back pg--${side}"></div>`;
@@ -274,7 +310,7 @@ function renderPage(page, side) {
           <p class="pg__text">${page.body}</p>
           <p class="pg__sign">${page.signature || "Always,"} ${snowyLink()}</p>
         </div>
-        ${side === "right" ? turnHintHtml() : ""}
+        ${showTurnHint(page, side)}
       </div>`;
     case "interactive": {
       const ix = CONTENT.interactive;
@@ -293,9 +329,9 @@ function renderPage(page, side) {
               <button type="button" class="ix-smile" data-smile="notyet">${ix.smiles.notyet}</button>
             </div>
           </div>
-          <div class="ix-block">
-            <label class="ix-lbl" for="ix-note">${ix.noteLabel} <em>${ix.noteOptional}</em></label>
-            <textarea id="ix-note" class="ix-note" rows="3" placeholder="${ix.notePlaceholder}"></textarea>
+          <div class="ix-block ix-note-block">
+            <label class="ix-lbl ix-note-lbl" for="ix-note">${ix.noteLabel}</label>
+            <textarea id="ix-note" class="ix-note" rows="4" placeholder="${ix.notePlaceholder}"></textarea>
           </div>
           <div class="ix-block">
             <p class="ix-msg" id="ix-msg" hidden></p>
@@ -353,7 +389,7 @@ function updateTurnHints() {
   const ixLeft = isInteractiveLeft();
   const endBack = atEnd && ixLeft;
 
-  zonePrev.classList.toggle("is-off", atStart || busy);
+  zonePrev.classList.toggle("is-off", atStart || busy || isPostChapter10Left());
   zonePrev.classList.toggle("turn-zone--on-right", endBack);
   zoneNext.classList.toggle("is-off", atEnd || busy);
   turnHints.classList.toggle("is-busy", busy);
@@ -485,13 +521,13 @@ function goBack() { turnPage(-1); }
 let responseSaving = false;
 let noteSaveTimer = null;
 
-async function submitAnswer(event, data, { closeOnSuccess = false } = {}) {
+async function submitAnswer(event, data, { closeOnSuccess = false, quiet = false } = {}) {
   const msg = document.getElementById("ix-msg");
   if (responseSaving) return;
 
   responseSaving = true;
   const ui = CONTENT?.ui || {};
-  if (msg) {
+  if (msg && !quiet) {
     msg.hidden = false;
     msg.className = "ix-msg";
     msg.textContent = ui.saving || "Saving…";
@@ -500,7 +536,7 @@ async function submitAnswer(event, data, { closeOnSuccess = false } = {}) {
   try {
     const result = await trackEvent(event, data);
     const savedAt = result.time?.display || "just now";
-    if (msg) {
+    if (msg && !quiet) {
       msg.className = "ix-msg ix-msg--ok";
       const tpl = closeOnSuccess
         ? (ui.thankYouClose || "Thank you… saved at {time}. Closing with love ♡")
@@ -542,18 +578,28 @@ function bindInteractive() {
       panel.querySelectorAll(".ix-smile").forEach((b) => b.classList.remove("on"));
       btn.classList.add("on");
       herResponse.smile = btn.dataset.smile;
-      submitAnswer("smile", { value: btn.dataset.smile }, { closeOnSuccess: true });
+      submitAnswer("smile", { value: btn.dataset.smile });
     });
   });
 
   const noteEl = panel.querySelector("#ix-note");
+  const noteBlock = panel.querySelector(".ix-note-block");
+
+  const stopNoteEvent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  noteBlock?.addEventListener("mousedown", stopNoteEvent);
+  noteBlock?.addEventListener("touchstart", stopNoteEvent, { passive: false });
+  noteBlock?.addEventListener("click", (e) => e.stopPropagation());
   noteEl?.addEventListener("input", () => {
     clearTimeout(noteSaveTimer);
     noteSaveTimer = setTimeout(() => {
       const text = noteEl.value.trim();
       if (!text) return;
       herResponse.note = text;
-      submitAnswer("note", { text });
+      submitAnswer("note", { text }, { quiet: true });
     }, 1200);
   });
   noteEl?.addEventListener("blur", () => {
@@ -726,14 +772,15 @@ function init() {
     const rect = bookOpen.getBoundingClientRect();
     const x = clientX - rect.left;
     const leftHalf = x <= rect.width / 2;
-    if (leftHalf && isInteractiveLeft()) return;
+    if (leftHalf && (isInteractiveLeft() || isPostChapter10Left())) return;
     if (!leftHalf && x > rect.width / 2 && spread < maxSpread()) goForward();
-    else if (leftHalf && spread > 0 && !isInteractiveLeft()) goBack();
+    else if (leftHalf && spread > 0 && !isInteractiveLeft() && !isPostChapter10Left()) goBack();
   }
 
   bookOpen.addEventListener("click", (e) => {
     if (busy || !isOpen) return;
     if (e.target.closest("[data-ix]") || e.target.closest("a") || e.target.closest("button")) return;
+    if (e.target.closest("textarea, input, label, select")) return;
     if (e.target.closest(".turn-zone")) return;
     handleBookTap(e.clientX);
   });
@@ -743,6 +790,7 @@ function init() {
 
   bookOpen.addEventListener("touchstart", (e) => {
     if (e.target.closest("[data-ix]") || e.target.closest("a") || e.target.closest("button")) return;
+    if (e.target.closest("textarea, input, label, select")) return;
     touchX = e.touches[0].clientX;
     touchY = e.touches[0].clientY;
     touchMoved = false;
@@ -760,6 +808,7 @@ function init() {
   bookOpen.addEventListener("touchend", (e) => {
     if (!isOpen || busy) return;
     if (e.target.closest("[data-ix]") || e.target.closest("a") || e.target.closest("button")) return;
+    if (e.target.closest("textarea, input, label, select")) return;
 
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchX;

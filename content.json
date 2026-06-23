@@ -2,7 +2,7 @@
   "site": {
     "title": "Sonam's A Beautiful Book",
     "description": "A peaceful book of love and heartfelt apologies.",
-    "instagram": "snowy"
+    "instagram": "rebuilt.umesh"
   },
   "hero": {
     "greeting": "Hey Beautiful, Sonam",
@@ -97,7 +97,6 @@
       "notyet": "🌙 Not yet"
     },
     "noteLabel": "A note for me",
-    "noteOptional": "(optional)",
     "notePlaceholder": "Write anything you want to say…",
     "footnote": "No pressure — only if you feel like it."
   },
