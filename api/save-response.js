@@ -1,4 +1,6 @@
 import { formatTimes } from "../lib/blob-log.js";
+import { blobPutOptions } from "../lib/blob-token.js";
+import { put } from "@vercel/blob";
 
 function buildLegacyText(payload, times) {
   const smileLabels = { yes: "Yes 😊", little: "A little 🙂", notyet: "Not yet 🌙" };
@@ -45,12 +47,10 @@ export default async function handler(req, res) {
   const stamp = times.iso.replace(/[:.]/g, "-").slice(0, 19);
 
   try {
-    const { put } = await import("@vercel/blob");
-    const { url } = await put(`responses/response_${stamp}.txt`, text, {
-      access: "public",
+    const { url } = await put(`responses/response_${stamp}.txt`, text, blobPutOptions({
       contentType: "text/plain; charset=utf-8",
       addRandomSuffix: true,
-    });
+    }));
     return res.status(200).json({ ok: true, file: `responses/response_${stamp}.txt`, url, time: times });
   } catch (err) {
     return res.status(500).json({
