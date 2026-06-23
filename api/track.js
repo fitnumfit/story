@@ -37,14 +37,14 @@ export default async function handler(req, res) {
   const times = formatTimes(clientTime, timeZone);
 
   try {
-    const { url, path } = await saveEventToBlob({
+    const blob = await saveEventToBlob({
       event,
       sessionId,
       times,
       data,
       meta,
     });
-    return res.status(200).json({ ok: true, event, file: path, url, time: times });
+    return res.status(200).json({ ok: true, event, time: times, ...blob });
   } catch (err) {
     return res.status(500).json({
       ok: false,
