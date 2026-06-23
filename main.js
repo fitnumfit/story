@@ -110,8 +110,12 @@ function snowyLink() {
   return `<a class="pg__ig" href="${igUrl()}" target="_blank" rel="noopener noreferrer">@${igHandle()}</a>`;
 }
 
-function turnHintHtml() {
-  return `<p class="pg__turn-hint">${CONTENT?.ui?.turnHint || "Click to turn page"}</p>`;
+function turnHintHtml(next = false) {
+  const text = next
+    ? (CONTENT?.ui?.turnHintNext || "Tap next to continue ♡")
+    : (CONTENT?.ui?.turnHint || "Click to turn page");
+  const mod = next ? " pg__turn-hint--next" : "";
+  return `<p class="pg__turn-hint${mod}">${text}</p>`;
 }
 
 function buildPages() {
@@ -252,20 +256,41 @@ function scheduleBookLayout() {
 
 const herResponse = { accepted: false, smile: "", note: "" };
 
-function isAfterChapter10(page) {
-  if (!page) return false;
-  if (page.type === "chapter-story" && page.number >= CHAPTERS.length) return true;
-  return ["finale", "interactive", "story-continue"].includes(page.type);
+function isLastChapterStory(page) {
+  return page?.type === "chapter-story" && page.number >= CHAPTERS.length;
 }
 
 function showTurnHint(page, side) {
-  if (!page || isAfterChapter10(page)) return "";
+  if (!page || page.type === "interactive" || page.type === "story-continue") return "";
   if (side !== "right") return "";
+  if (isLastChapterStory(page) || page.type === "finale") return turnHintHtml(true);
   return turnHintHtml();
 }
 
 function isPostChapter10Left() {
-  return isAfterChapter10(PAGES[spread]);
+  const left = PAGES[spread];
+  if (!left) return false;
+  return isLastChapterStory(left) || left.type === "finale";
+}
+
+function getNoteText() {
+  const el = document.getElementById("ix-note");
+  return (el?.value || herResponse.note || "").trim();
+}
+
+function hasRequiredNote() {
+  return getNoteText().length > 0;
+}
+
+function showNoteRequired() {
+  const ix = CONTENT?.interactive;
+  const msg = document.getElementById("ix-msg");
+  if (msg) {
+    msg.hidden = false;
+    msg.className = "ix-msg ix-msg--err";
+    msg.textContent = ix?.noteRequired || "Please write your note before continuing ♡";
+  }
+  document.getElementById("ix-note")?.focus();
 }
 function blankPaper(side) {
   return `<div class="pg pg--paper-back pg--${side}"></div>`;
@@ -330,8 +355,9 @@ function renderPage(page, side) {
             </div>
           </div>
           <div class="ix-block ix-note-block">
-            <label class="ix-lbl ix-note-lbl" for="ix-note">${ix.noteLabel}</label>
-            <textarea id="ix-note" class="ix-note" rows="4" placeholder="${ix.notePlaceholder}"></textarea>
+            <label class="ix-lbl ix-note-lbl" for="ix-note">${ix.noteLabel} <span class="ix-required">*</span></label>
+            <textarea id="ix-note" class="ix-note" rows="4" placeholder="${ix.notePlaceholder}" required aria-required="true"></textarea>
+            <button type="button" class="ix-btn ix-btn--send" data-act="note-send">${ix.noteSendButton || "Send note ♡"}</button>
           </div>
           <div class="ix-block">
             <p class="ix-msg" id="ix-msg" hidden></p>
@@ -394,6 +420,8 @@ function updateTurnHints() {
   zoneNext.classList.toggle("is-off", atEnd || busy);
   turnHints.classList.toggle("is-busy", busy);
   turnHints.classList.toggle("is-ix-mode", ixLeft);
+  turnHints.classList.toggle("is-ix-hidden", isInteractiveSpread());
+  bookOpen?.classList.toggle("is-ix-active", isInteractiveSpread());
 
   updateEndActions();
 }
@@ -466,6 +494,11 @@ function waitFlip(ms) {
 
 async function turnPage(dir) {
   if (!isOpen || busy) return;
+
+  if (dir > 0 && isInteractiveSpread() && !hasRequiredNote()) {
+    showNoteRequired();
+    return;
+  }
 
   const next = spread + dir * 2;
   if (next < 0 || next > maxSpread()) return;
@@ -583,31 +616,26 @@ function bindInteractive() {
   });
 
   const noteEl = panel.querySelector("#ix-note");
-  const noteBlock = panel.querySelector(".ix-note-block");
+  if (noteEl && herResponse.note) noteEl.value = herResponse.note;
 
-  const stopNoteEvent = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const saveNote = (quiet = true) => {
+    const text = noteEl?.value.trim() || "";
+    if (!text) {
+      showNoteRequired();
+      return;
+    }
+    herResponse.note = text;
+    submitAnswer("note", { text }, { quiet });
   };
 
-  noteBlock?.addEventListener("mousedown", stopNoteEvent);
-  noteBlock?.addEventListener("touchstart", stopNoteEvent, { passive: false });
-  noteBlock?.addEventListener("click", (e) => e.stopPropagation());
   noteEl?.addEventListener("input", () => {
     clearTimeout(noteSaveTimer);
-    noteSaveTimer = setTimeout(() => {
-      const text = noteEl.value.trim();
-      if (!text) return;
-      herResponse.note = text;
-      submitAnswer("note", { text }, { quiet: true });
-    }, 1200);
+    noteSaveTimer = setTimeout(() => saveNote(true), 1200);
   });
-  noteEl?.addEventListener("blur", () => {
-    clearTimeout(noteSaveTimer);
-    const text = noteEl.value.trim();
-    if (!text) return;
-    herResponse.note = text;
-    submitAnswer("note", { text });
+
+  panel.querySelector("[data-act=note-send]")?.addEventListener("click", (e) => {
+    e.stopPropagation();
+    saveNote(false);
   });
 }
 
@@ -642,6 +670,10 @@ function openBook() {
 
 function closeBook() {
   if (!isOpen || busy) return;
+  if (!hasRequiredNote()) {
+    showNoteRequired();
+    return;
+  }
   busy = true;
   trackEvent("book_closed").catch(() => {});
 
@@ -751,8 +783,13 @@ function init() {
   });
 
   btnOpen.addEventListener("click", () => {
-    if (isOpen && spread >= maxSpread()) closeBook();
-    else openBook();
+    if (isOpen && spread >= maxSpread()) {
+      if (!hasRequiredNote()) {
+        showNoteRequired();
+        return;
+      }
+      closeBook();
+    } else openBook();
   });
 
   zonePrev?.addEventListener("click", (e) => {
@@ -836,6 +873,7 @@ function init() {
 
   document.addEventListener("keydown", (e) => {
     if (!isOpen || busy) return;
+    if (e.target.closest("textarea, input")) return;
     if (e.key === "ArrowRight") goForward();
     if (e.key === "ArrowLeft") goBack();
   });

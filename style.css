@@ -366,6 +366,23 @@ body {
   overflow: hidden;
   min-height: 0;
 }
+.turn-hints.is-ix-hidden {
+  visibility: hidden;
+  pointer-events: none !important;
+}
+
+.turn-hints.is-ix-hidden .turn-zone {
+  pointer-events: none !important;
+}
+
+.book-open.is-ix-active .book-open__layer:has(.pg--ix) {
+  z-index: 30;
+}
+
+.book-open.is-ix-active .book-open__slot:has(.pg--ix) {
+  z-index: 25;
+}
+
 .turn-hints.is-ix-mode .turn-zone--left:not(.turn-zone--on-right) {
   pointer-events: none !important;
   visibility: hidden !important;
@@ -744,6 +761,13 @@ body {
   text-align: center;
   position: relative;
   z-index: 1;
+  pointer-events: auto;
+}
+.pg--ix .pg__inner,
+.pg--ix .ix-block,
+.pg--ix .ix-note-block,
+.pg--ix .ix-note {
+  pointer-events: auto;
 }
 .pg--ix .pg__inner {
   gap: 0.55rem;
@@ -818,6 +842,12 @@ body {
 }
 .ix-note-block {
   width: 100%;
+  position: relative;
+  z-index: 2;
+}
+.ix-required {
+  color: var(--cover);
+  font-weight: 600;
 }
 .ix-note {
   width: 100%;
@@ -826,13 +856,21 @@ body {
   border: 1px solid rgba(168, 50, 72, 0.28);
   border-radius: 8px;
   font-family: inherit;
-  font-size: 0.76rem;
+  font-size: 16px;
   line-height: 1.45;
   color: var(--ink);
   background: #fff;
   resize: vertical;
   min-height: 4rem;
   text-align: left;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.pg__turn-hint--next {
+  color: var(--cover-dark);
+  font-weight: 500;
 }
 .ix-msg {
   font-size: 0.65rem;

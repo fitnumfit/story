@@ -98,7 +98,9 @@
     },
     "noteLabel": "A note for me",
     "notePlaceholder": "Write anything you want to say…",
-    "footnote": "No pressure — only if you feel like it."
+    "noteSendButton": "Send note ♡",
+    "noteRequired": "Please write your note — it means a lot to me ♡",
+    "footnote": "Your note is needed before you finish."
   },
   "storyContinue": {
     "title": "Story continues…",
@@ -107,6 +109,7 @@
   },
   "ui": {
     "turnHint": "Click to turn page",
+    "turnHintNext": "Tap next to continue ♡",
     "saving": "Saving…",
     "saved": "Saved at {time} ♡",
     "thankYouClose": "Thank you… saved at {time}. Closing with love ♡",
