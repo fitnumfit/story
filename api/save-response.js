@@ -1,13 +1,14 @@
-import { put } from "@vercel/blob";
+import { formatTimes } from "../lib/blob-log.js";
 
-function buildText(payload) {
+function buildLegacyText(payload, times) {
   const smileLabels = { yes: "Yes 😊", little: "A little 🙂", notyet: "Not yet 🌙" };
-  const now = new Date();
   const lines = [
     "========================================",
     "  BOOK RESPONSE — For You",
     "========================================",
-    `Saved at : ${now.toISOString()}`,
+    `Saved at    : ${times.display}`,
+    `Time (ISO)  : ${times.iso}`,
+    `Time zone   : ${times.timeZone}`,
     "----------------------------------------",
     `Accepted apology: ${payload.accepted ? "YES ♡" : "No"}`,
   ];
@@ -39,24 +40,18 @@ export default async function handler(req, res) {
   const payload = body?.payload;
   if (!payload) return res.status(400).json({ ok: false, error: "Missing payload" });
 
-  const text = buildText(payload);
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const filename = `responses/response_${stamp}.txt`;
+  const times = formatTimes(body.clientTime, body.timeZone);
+  const text = buildLegacyText(payload, times);
+  const stamp = times.iso.replace(/[:.]/g, "-").slice(0, 19);
 
   try {
-    const blob = await put(filename, text, {
+    const { put } = await import("@vercel/blob");
+    const { url } = await put(`responses/response_${stamp}.txt`, text, {
       access: "public",
       contentType: "text/plain; charset=utf-8",
       addRandomSuffix: true,
     });
-
-    await put(`responses/all-responses_${stamp}.txt`, text, {
-      access: "public",
-      contentType: "text/plain; charset=utf-8",
-      addRandomSuffix: false,
-    }).catch(() => {});
-
-    return res.status(200).json({ ok: true, file: filename, url: blob.url });
+    return res.status(200).json({ ok: true, file: `responses/response_${stamp}.txt`, url, time: times });
   } catch (err) {
     return res.status(500).json({
       ok: false,

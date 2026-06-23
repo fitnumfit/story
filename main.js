@@ -12,8 +12,71 @@ const CHAPTERS = [
 const INTRO = { title: "Before you read this…", body: "I know you blocked me, and I understand why. This isn't to argue or pressure you — only to say sorry, honestly, from my heart." };
 const FINALE = { title: "From my heart", body: "If you ever feel ready, I'd love to rebuild what we had — slowly, with respect and love. You'll always have a place in my heart." };
 
-const SAVE_API = "/api/save-response";
+const TRACK_API = "/api/track";
 const TURN_MS = 1000;
+const SESSION_KEY = "bookSession";
+const LINK_TRACKED_KEY = "bookLinkTracked";
+
+function getSessionId() {
+  let id = sessionStorage.getItem(SESSION_KEY);
+  if (!id) {
+    id = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    sessionStorage.setItem(SESSION_KEY, id);
+  }
+  return id;
+}
+
+function getTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
+
+function pageMeta() {
+  const left = PAGES[spread];
+  const right = PAGES[spread + 1];
+  const page = left || right;
+  return {
+    spread,
+    pageType: page?.type || "unknown",
+    pageTitle: page?.title || (page?.number ? `Chapter ${page.number}` : ""),
+  };
+}
+
+async function trackEvent(event, data = {}) {
+  try {
+    const res = await fetch(TRACK_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event,
+        sessionId: getSessionId(),
+        clientTime: new Date().toISOString(),
+        timeZone: getTimeZone(),
+        data,
+        meta: {
+          referrer: document.referrer || "direct",
+          userAgent: navigator.userAgent,
+          ...pageMeta(),
+        },
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.ok) throw new Error(json.error || "Could not save");
+    return json;
+  } catch (err) {
+    console.warn("Track failed:", err);
+    throw err;
+  }
+}
+
+function trackLinkOpenedOnce() {
+  if (sessionStorage.getItem(LINK_TRACKED_KEY)) return;
+  sessionStorage.setItem(LINK_TRACKED_KEY, "1");
+  trackEvent("link_opened").catch(() => {});
+}
 
 function igUrl() {
   return `https://www.instagram.com/${SNOWY_IG}`;
@@ -100,7 +163,6 @@ function renderPage(page, side) {
           <textarea id="ix-note" class="ix-note" rows="3" placeholder="Write anything you want to say…"></textarea>
         </div>
         <div class="ix-block">
-          <button type="button" class="ix-btn ix-btn--send" data-act="send">Send my response ♡</button>
           <p class="ix-msg" id="ix-msg" hidden></p>
         </div>
         <p class="ix-foot">No pressure — only if you feel like it.</p>
@@ -266,6 +328,7 @@ async function turnPage(dir) {
     spread = next;
     flipper.classList.remove("is-flipping");
     await nextFrame();
+    trackEvent("page_turn", pageMeta()).catch(() => {});
   } catch (err) {
     console.error("Page turn error:", err);
   } finally {
@@ -279,32 +342,39 @@ async function turnPage(dir) {
 function goForward() { turnPage(1); }
 function goBack() { turnPage(-1); }
 
-function buildResponseText(data) {
-  const smileLabels = { yes: "Yes 😊", little: "A little 🙂", notyet: "Not yet 🌙" };
-  const now = new Date();
-  const lines = [
-    "========================================",
-    "  BOOK RESPONSE — For You",
-    "========================================",
-    `Saved at : ${now.toISOString()}`,
-    "----------------------------------------",
-    `Accepted apology: ${data.accepted ? "YES ♡" : "No"}`,
-  ];
-  if (data.smile) lines.push(`Smile: ${smileLabels[data.smile] || data.smile}`);
-  if (data.note) lines.push("", "Her note:", data.note);
-  lines.push("========================================");
-  return lines.join("\n") + "\n";
-}
+let responseSaving = false;
+let noteSaveTimer = null;
 
-async function saveResponse(data) {
-  const res = await fetch(SAVE_API, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ payload: data }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.ok) throw new Error(json.error || "Could not save");
-  return json;
+async function submitAnswer(event, data, { closeOnSuccess = false } = {}) {
+  const msg = document.getElementById("ix-msg");
+  if (responseSaving) return;
+
+  responseSaving = true;
+  if (msg) {
+    msg.hidden = false;
+    msg.className = "ix-msg";
+    msg.textContent = "Saving…";
+  }
+
+  try {
+    const result = await trackEvent(event, data);
+    const savedAt = result.time?.display || "just now";
+    if (msg) {
+      msg.className = "ix-msg ix-msg--ok";
+      msg.textContent = closeOnSuccess
+        ? `Thank you… saved at ${savedAt}. Closing with love ♡`
+        : `Saved at ${savedAt} ♡`;
+    }
+    if (closeOnSuccess) setTimeout(closeBook, 2200);
+  } catch (err) {
+    if (msg) {
+      msg.hidden = false;
+      msg.className = "ix-msg ix-msg--err";
+      msg.textContent = err.message || "Could not save. On Vercel: add Blob storage in project Settings → Storage.";
+    }
+  } finally {
+    responseSaving = false;
+  }
 }
 
 function bindInteractive() {
@@ -321,6 +391,7 @@ function bindInteractive() {
     herResponse.accepted = true;
     e.currentTarget.textContent = "Accepted ♡";
     e.currentTarget.classList.add("ix-btn--done");
+    submitAnswer("accept_apology", { accepted: true });
   });
 
   panel.querySelectorAll("[data-smile]").forEach((btn) => {
@@ -329,39 +400,26 @@ function bindInteractive() {
       panel.querySelectorAll(".ix-smile").forEach((b) => b.classList.remove("on"));
       btn.classList.add("on");
       herResponse.smile = btn.dataset.smile;
+      submitAnswer("smile", { value: btn.dataset.smile }, { closeOnSuccess: true });
     });
   });
 
-  panel.querySelector("[data-act=send]")?.addEventListener("click", async (e) => {
-    e.stopPropagation();
-    const msg = document.getElementById("ix-msg");
-    const noteEl = document.getElementById("ix-note");
-    herResponse.note = noteEl?.value.trim() || "";
-
-    if (!herResponse.accepted && !herResponse.smile && !herResponse.note) {
-      msg.hidden = false;
-      msg.className = "ix-msg ix-msg--err";
-      msg.textContent = "Tap accept, pick a smile, or write a note first.";
-      return;
-    }
-
-    const sendBtn = e.currentTarget;
-    sendBtn.disabled = true;
-    sendBtn.textContent = "Sending…";
-
-    try {
-      await saveResponse({ ...herResponse });
-      msg.hidden = false;
-      msg.className = "ix-msg ix-msg--ok";
-      msg.textContent = "Thank you… closing the book with love. ♡";
-      setTimeout(closeBook, 2200);
-    } catch (err) {
-      msg.hidden = false;
-      msg.className = "ix-msg ix-msg--err";
-      msg.textContent = err.message || "Could not save. On Vercel: add Blob storage in project Settings → Storage.";
-      sendBtn.disabled = false;
-      sendBtn.textContent = "Send my response ♡";
-    }
+  const noteEl = panel.querySelector("#ix-note");
+  noteEl?.addEventListener("input", () => {
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(() => {
+      const text = noteEl.value.trim();
+      if (!text) return;
+      herResponse.note = text;
+      submitAnswer("note", { text });
+    }, 1200);
+  });
+  noteEl?.addEventListener("blur", () => {
+    clearTimeout(noteSaveTimer);
+    const text = noteEl.value.trim();
+    if (!text) return;
+    herResponse.note = text;
+    submitAnswer("note", { text });
   });
 }
 
@@ -388,6 +446,7 @@ function openBook() {
     resetBookState();
     paintSpread();
     startMusic();
+    trackEvent("book_opened").catch(() => {});
     busy = false;
   }, 400);
 }
@@ -395,6 +454,7 @@ function openBook() {
 function closeBook() {
   if (!isOpen || busy) return;
   busy = true;
+  trackEvent("book_closed").catch(() => {});
 
   if (bgm) {
     bgm.pause();
@@ -434,7 +494,15 @@ function setupInstagramLinks() {
   if (footerIg) {
     footerIg.href = igUrl();
     footerIg.textContent = `@${SNOWY_IG}`;
+    footerIg.addEventListener("click", () => {
+      trackEvent("instagram_click", { url: igUrl() }).catch(() => {});
+    });
   }
+
+  document.addEventListener("click", (e) => {
+    const ig = e.target.closest(".pg__ig");
+    if (ig?.href) trackEvent("instagram_click", { url: ig.href }).catch(() => {});
+  });
 }
 
 function init() {
@@ -460,6 +528,7 @@ function init() {
   musicIcon = document.getElementById("music-icon");
 
   setupInstagramLinks();
+  trackLinkOpenedOnce();
 
   musicBtn.addEventListener("click", () => {
     musicOn = !musicOn;
