@@ -1,0 +1,116 @@
+{
+  "site": {
+    "title": "Sonam's A Beautiful Book",
+    "description": "A peaceful book of love and heartfelt apologies.",
+    "instagram": "snowy"
+  },
+  "hero": {
+    "greeting": "Hey Beautiful, Sonam",
+    "message": "Would you open this book for me?",
+    "hint": "10 chapters · peace, love & honesty"
+  },
+  "cover": {
+    "icon": "☮",
+    "title": "Written by Snowy's Friend",
+    "subtitle": "Hey Beautiful · Open with smile"
+  },
+  "readingBar": {
+    "greeting": "Hey Beautiful,"
+  },
+  "buttons": {
+    "openBook": "Open the book ♡",
+    "closeBook": "Close & reopen book ♡"
+  },
+  "footer": {
+    "text": "Made with love by"
+  },
+  "intro": {
+    "title": "Before you turn the page read this…",
+    "body": "I know you blocked me, and I understand why. This isn't to argue or pressure you — only to say sorry, honestly, from my heart."
+  },
+  "chapters": [
+    {
+      "title": "Sorry",
+      "image": "images/chapter-1-sorry.jpeg",
+      "story": "Sonam, main tumse poori honesty ke saath sorry bolna chahta hoon. Agar maine tumhe irritate kiya, uncomfortable feel karwaya ya pareshan kiya, toh uske liye i am truly sorry. Mera kabhi bhi intention tumhe hurt ya disturb karne ka nahi tha. Agar mujhse galtiyan hui hain, toh main unhe accept karta hoon aur future mein dhyan rakhunga ki aisa dobara na ho. Mera intention hamesha bas tumhe smile karwana aur tumhari care karna tha."
+    },
+    {
+      "title": "Angle is Born",
+      "image": "images/chapter-2-born.jpeg",
+      "story": "04 March 1998 ko Raj Kumar Yadav ji ke ghar ek pyari si bachchi aayi, jo apne saath family ke liye luck, khushiyan aur roshni lekar aayi. Tumhare aane se ghar mein ek nayi muskaan aur ek nayi umeed aayi. Papa ki progress, mummy ki khushi, aur papa ki laadli ka aana — ye sab unke liye zindagi ke sabse khoobsurat palon mein se ek hoga. Shayad tumhe wo pal yaad na ho, par tumhare ghar walon ke liye us din ek angel ne janam liya tha, jisne unki duniya aur bhi khoobsurat bana di"
+    },
+    {
+      "title": "Stubborn Sonam",
+      "image": "images/chapter-3-sonam.jpeg",
+      "story": "Sonam… Meerut ki naan khatai ki tarah, ekdum chatpati. Chhoti si, gusse wali, par dil se bahut naram. Haan, aisi hi hai Sonam. School aur college khatam karne ke baad usne apne career par dhyaan diya, apni marzi se content writer bani, family ko support kiya, bhai-behen ka saath diya. Overall, ek chhota packet bada dhamaka. Haan, kuch kamiyaan bhi hain — ya shayad kamiyaan nahi, bas zindagi ke tajurbe hain, jinhone kabhi waqt ne aur kabhi logon ne majboori mein use thoda pathar-dil bana diya. Par andar se, uska dil aaj bhi ek masoom bachche jaisa hi hai"
+    },
+    {
+      "title": "Family",
+      "image": "images/chapter-4-family.jpeg",
+      "story": "Family ke liye, apne papa ki pari aur laadli… jo apni khushiyon se pehle hamesha apne ghar walon ke baare mein sochti hai. Kabhi kabhi shayad family ka poora support na mile, lekin papa ka saath hona hi uske liye kaafi hai. Kyunki jab papa saath hote hain, toh lagta hai sab sambhal jayega. Unka bharosa aur pyaar hi uski sabse badi taaqat hai"
+    },
+    {
+      "title": "A Beautiful Meeting",
+      "image": "images/chapter-5-meeting.jpeg",
+      "story": "Ab tak toh tum Sonam ke baare mein kaafi kuch jaan hi gaye hoge. Ab kahani mein ek khoobsurat din aata hai — **6 March 2026**. Us din hum mile. Dono ki zindagi mein apni-apni problems thi, par pata nahi kyun, aisa laga jaise koi positive energy ho jo dil ke andar ek alag si khushi bhar rahi ho. Jaise waqt kuch der ke liye tham gaya ho, aur bas us insaan ko dekhkar hi sukoon mil raha ho. Baatein karna, hasna, saath khana — har ek moment apne aap mein sukoon se bhara tha. Wahin se humari dosti ki shuruaat hui. Aur haan, hum ek hi company mein the, par usse pehle shayad ek dusre ka chehra tak yaad nahi tha. Lekin jab mile, toh ek ajeeb sa apnapan aur sukoon zaroor tha."
+    },
+    {
+      "title": "A Vibe Connection",
+      "image": "images/chapter-6-connection.jpeg",
+      "story": "Kabhi aapne socha hai ki koi insaan humein achanak pasand kyun aane lagta hai? Hum kyun roz ussi ek insaan se baat karna chahte hain, kyun uske baare mein sochne lag jaate hain? Shayad usse hi vibe aur connection kehte hain. Haan, zindagi mein apni problems aur udaasi chal rahi thi, par hum dono ke beech dheere-dheere ek khaas connection develop hone laga. Random calls, office ki baatein, video calls par hasi aur khushi ke pal — wo pasta ,wo mera veg wrap roll banana , i can always cook for you  sab kuch apne aap mein special lagne laga. Aur haan, mujhe yaad hai tumhara Gurbani gaana… tab dheere-dheere samajh aaya ki ye ladki sirf baatein hi nahi, gaa bhi sakti hai aur piano bhi baja sakti hai. Ek alag hi vibe thi. Aur pata hi nahi chala kab ye sab meri aadat ka hissa ban gaya."
+    },
+    {
+      "title": "Snowy the Cat",
+      "image": "images/chapter-7-snowy.jpeg",
+      "story": "Snowy the cat… tumhe hamesha ek billi chahiye thi, par baar-baar baat ban nahi pa rahi thi. Humare beech bhi kabhi ignorance thi, kabhi cheezein sahi chalti thi, kabhi uljhan hoti thi. Par ek cheez mere dimaag mein hamesha thi — agar is ladki ko khushi mil sakti hai, toh main har wo effort karunga jisse ye khush rahe. Aur phir humari life mein aayi Snowy. Usse lene ke liye Gurgaon tak aana, aur itne safar mein hi main us chhoti si jaan se attach ho gaya. Toh socho, Sonam usse paakar kitni khush hui hogi. Snowy ke aane se Sonam ki smile aur uska glow aur bhi badh gaya, aur uski life mein jo alag sa akelapan tha, wo jaise us naye mehmaan ke aane se thoda bhar gaya. Shayad main hamesha bas yahi chahta tha — uski zindagi mein aise chhote-chhote reasons laana, jo usse khush rakh sake."
+    },
+    {
+      "title": "The Friendship Code",
+      "image": "images/chapter-8-code.jpeg",
+      "story": "**17 April 2026** — humari dosti ka ek khaas din. Ek **100 ke note** par sign karke humne ek friendship code share kiya tha. Dusron ke liye wo bas ek note tha, par humare liye ek promise — ki jab bhi life mein saath, support ya sukoon ki zarurat pade, hum ek dusre ke liye hamesha rahenge. Chahe kitni bhi misunderstandings ya dooriyan aayein, bas wo code yaad rakhna… kyunki usmein ek baat hamesha thi — **tumhari khushi matter karti hai.**"
+    },
+    {
+      "title": "A Hope for Us",
+      "image": "images/snowy.jpeg",
+      "story": "Sonam , mere jitne mai efforts the wo sirf tumhari khusi ke liye , yaad hai wo 3D pen se sonam likhna , i want you to hang on your wall , so that whenever you see , it , makes you smile , I don’t expect you to forgive me right away. I just hope one day we can find peace again — even a quiet hello would mean everything. I still see hope in Snowy, and somewhere, I still see hope in you too."
+    },
+    {
+      "title": "Positivity",
+      "image": "images/positivity.jpeg",
+      "story": "Sonam,Tum meri life mai ek luck lekar aayi , mai khush rhne lga , har wo chij thik hone lagi thi jo jo sochi thi , yhi positivity se mai tumhe devi roop mai dekhta hu, mujhe pata hai mujhme kamiyaan hain aur maine galtiyan bhi ki hain. Shayad tumhe kho dene ke darr mein, tumhe paane ki chah mein, main kuch aise kadam utha gaya jo sahi nahi the. Bhagwan ne hume ek khoobsurat dosti di thi, aur main uske har pal ke liye thankful hoon. Main hamesha bas tumhe haste hue, khush aur apni life mein grow karte dekhna chahta tha. Tumhari health, work, family aur zindagi sab theek rahe — bas yahi dil se chahta hoon. Haan, tumhare silence aur block ka dard mujhe feel hota hai. Anxiety bhi hoti hai, par shayad ye bhi zaroori tha, taaki main khud ko samajh paun aur better bana paun. Aur aaj main wahi kar raha hoon — gym, diet, office… I am growing and glowing. Main bas itna chahta hoon ki ek din jab waqt sahi ho, hum dono iss story ko dard se nahi, ek achhi yaad aur ek smile ke saath dekh paayein. Tab tak, apna aur Snowy ka khayal rakhna."
+    }
+  ],
+  "finale": {
+    "title": "From my heart",
+    "body": "If you ever feel ready, I'd love to rebuild what we had — slowly, with respect and love. You'll always have a place in my heart.",
+    "signature": "Always,"
+  },
+  "interactive": {
+    "label": "A gentle ask",
+    "title": "Your turn ♡",
+    "acceptButton": "Can you accept my apologies?",
+    "acceptDone": "Accepted ♡",
+    "smileQuestion": "Did this bring a little smile?",
+    "smiles": {
+      "yes": "😊 Yes",
+      "little": "🙂 A little",
+      "notyet": "🌙 Not yet"
+    },
+    "noteLabel": "A note for me",
+    "noteOptional": "(optional)",
+    "notePlaceholder": "Write anything you want to say…",
+    "footnote": "No pressure — only if you feel like it."
+  },
+  "storyContinue": {
+    "title": "Story continues…",
+    "body": "Maybe one day we'll write the next chapter together — slowly, with peace and love.",
+    "signature": "Always,"
+  },
+  "ui": {
+    "turnHint": "Click to turn page",
+    "saving": "Saving…",
+    "saved": "Saved at {time} ♡",
+    "thankYouClose": "Thank you… saved at {time}. Closing with love ♡",
+    "saveError": "Could not save. On Vercel: add Blob storage in project Settings → Storage."
+  }
+}

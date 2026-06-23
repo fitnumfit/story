@@ -1,22 +1,16 @@
-/* ===== EDIT THESE ===== */
-const SNOWY_IG = "snowy"; // ← your Instagram @username (no @)
-
-const CHAPTERS = [
-  { title: "I'm sorry", image: "images/chapter-1.svg", story: "I know I hurt you, and I hate that you're carrying pain because of me. You never deserved any of it. I'm truly sorry." },
-  { title: "You matter to me", image: "images/chapter-2.svg", story: "Even though things went wrong between us, you still mean the world to me. Your happiness and peace always mattered to me." },
-  { title: "What I did wrong", image: "images/chapter-3.svg", story: "I take full responsibility. No excuses. I see clearly now how my actions pushed you away, and I regret it deeply." },
-  { title: "The friendship we had", image: "images/chapter-4.svg", story: "What we shared was real — the laughs, the late talks, the comfort of knowing someone cared. I miss that. I miss you." },
-  { title: "A hope for us", image: "images/chapter-5.svg", story: "I don't expect you to forgive me right away. I just hope one day we can find peace again — even a quiet hello would mean everything." },
-];
-
-const INTRO = { title: "Before you read this…", body: "I know you blocked me, and I understand why. This isn't to argue or pressure you — only to say sorry, honestly, from my heart." };
-const FINALE = { title: "From my heart", body: "If you ever feel ready, I'd love to rebuild what we had — slowly, with respect and love. You'll always have a place in my heart." };
-
+const CONTENT_URL = "content.json";
 const TRACK_API = "/api/track";
 const TURN_MS = 1000;
 const SESSION_KEY = "bookSession";
 const LINK_TRACKED_KEY = "bookLinkTracked";
+const BOOK_SCALE_KEY = "bookScale";
+const BOOK_SCALE_MIN = 0.85;
+const BOOK_SCALE_MAX = 1.4;
+const BOOK_SCALE_STEP = 0.1;
 
+let CONTENT = null;
+let CHAPTERS = [];
+let PAGES = [];
 function getSessionId() {
   let id = sessionStorage.getItem(SESSION_KEY);
   if (!id) {
@@ -78,31 +72,73 @@ function trackLinkOpenedOnce() {
   trackEvent("link_opened").catch(() => {});
 }
 
+function igHandle() {
+  return CONTENT?.site?.instagram || "snowy";
+}
+
 function igUrl() {
-  return `https://www.instagram.com/${SNOWY_IG}`;
+  return `https://www.instagram.com/${igHandle()}`;
 }
 
 function snowyLink() {
-  return `<a class="pg__ig" href="${igUrl()}" target="_blank" rel="noopener noreferrer">@${SNOWY_IG}</a>`;
+  return `<a class="pg__ig" href="${igUrl()}" target="_blank" rel="noopener noreferrer">@${igHandle()}</a>`;
+}
+
+function turnHintHtml() {
+  return `<p class="pg__turn-hint">${CONTENT?.ui?.turnHint || "Click to turn page"}</p>`;
 }
 
 function buildPages() {
-  const pages = [{ type: "intro", ...INTRO }];
+  const pages = [{ type: "intro", ...CONTENT.intro }];
   CHAPTERS.forEach((ch, i) => {
     const n = i + 1;
     pages.push({ type: "chapter-start", number: n, title: ch.title });
     pages.push({ type: "chapter-story", number: n, image: ch.image, story: ch.story });
   });
-  pages.push({ type: "finale", ...FINALE });
+  pages.push({ type: "finale", ...CONTENT.finale });
   pages.push({ type: "interactive" });
   pages.push({ type: "story-continue" });
   return pages;
 }
 
-const PAGES = buildPages();
+async function loadContent() {
+  const res = await fetch(CONTENT_URL);
+  if (!res.ok) throw new Error(`Could not load ${CONTENT_URL}`);
+  CONTENT = await res.json();
+  CHAPTERS = CONTENT.chapters || [];
+  PAGES = buildPages();
+}
 
-let book, bookClosed, bookOpen, actionsOpen, footer;
+function applyContentToPage() {
+  const { site, hero, cover, readingBar, buttons, footer } = CONTENT;
+
+  if (site?.title) document.title = site.title;
+  if (site?.description) {
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.content = site.description;
+  }
+
+  const setText = (id, text) => {
+    const el = document.getElementById(id);
+    if (el && text != null) el.textContent = text;
+  };
+
+  setText("hero-greeting", hero?.greeting);
+  setText("hero-message", hero?.message);
+  setText("hero-hint", hero?.hint);
+  setText("cover-icon", cover?.icon);
+  setText("cover-title", cover?.title);
+  setText("cover-sub", cover?.subtitle);
+  setText("reading-bar-hi", readingBar?.greeting);
+  setText("btn-open", buttons?.openBook);
+  setText("footer-text", footer?.text);
+
+  const footerIg = document.getElementById("footer-ig");
+  if (footerIg) footerIg.textContent = `@${igHandle()}`;
+}
+let book, bookClosed, bookOpen, actionsOpen, footer, bookStage;
 let btnOpen, zonePrev, zoneNext, turnHints, readingBar;
+let btnSizeDown, btnSizeUp, bookSizeLabel;
 let layerLeft, layerRight, underLeft, underRight;
 let flipper, flipFront, flipBack;
 let bgm, musicBtn, musicIcon;
@@ -112,19 +148,95 @@ let spread = 0;
 let busy = false;
 let touchX = 0;
 let musicOn = true;
+let bookScale = 1;
+let layoutRaf = 0;
+
+function readStoredBookScale() {
+  const stored = parseFloat(sessionStorage.getItem(BOOK_SCALE_KEY));
+  if (!Number.isFinite(stored)) return 1;
+  return Math.min(BOOK_SCALE_MAX, Math.max(BOOK_SCALE_MIN, stored));
+}
+
+function persistBookScale() {
+  sessionStorage.setItem(BOOK_SCALE_KEY, String(bookScale));
+}
+
+function updateBookScaleControls() {
+  if (!btnSizeDown || !btnSizeUp || !bookSizeLabel) return;
+  const pct = Math.round(bookScale * 100);
+  bookSizeLabel.textContent = `${pct}%`;
+  btnSizeDown.disabled = bookScale <= BOOK_SCALE_MIN + 0.001;
+  btnSizeUp.disabled = bookScale >= BOOK_SCALE_MAX - 0.001;
+}
+
+function effectiveBookScale() {
+  if (window.matchMedia("(max-width: 640px)").matches) return 1;
+  return bookScale;
+}
+
+function applyBookScale() {
+  updateBookScaleControls();
+  syncBookLayout();
+}
+
+function changeBookScale(delta) {
+  const next = Math.round((bookScale + delta) * 10) / 10;
+  if (next < BOOK_SCALE_MIN || next > BOOK_SCALE_MAX) return;
+  bookScale = next;
+  persistBookScale();
+  applyBookScale();
+}
+
+function measureBookChrome() {
+  const app = document.getElementById("app");
+  if (!app) return;
+
+  const styles = getComputedStyle(app);
+  const padTop = parseFloat(styles.paddingTop) || 0;
+  const padBottom = parseFloat(styles.paddingBottom) || 0;
+  const gap = parseFloat(styles.gap) || 0;
+  let chrome = padTop + padBottom + gap;
+
+  if (readingBar && !readingBar.hidden) {
+    chrome += readingBar.offsetHeight + gap;
+  }
+  if (actionsOpen && actionsOpen.style.display !== "none" && !actionsOpen.classList.contains("is-hide")) {
+    chrome += actionsOpen.offsetHeight + gap;
+  }
+  if (footer) {
+    chrome += footer.offsetHeight;
+  }
+
+  const viewportH = window.visualViewport?.height ?? window.innerHeight;
+  const maxBookH = Math.max(220, viewportH - chrome - 8);
+  document.documentElement.style.setProperty("--book-chrome", `${Math.ceil(chrome)}px`);
+  document.documentElement.style.setProperty("--spread-h-max", `${Math.floor(maxBookH)}px`);
+}
+
+function syncBookLayout() {
+  document.documentElement.style.setProperty("--book-scale", String(effectiveBookScale()));
+  measureBookChrome();
+  requestAnimationFrame(() => requestAnimationFrame(markScrollablePages));
+}
+
+function scheduleBookLayout() {
+  cancelAnimationFrame(layoutRaf);
+  layoutRaf = requestAnimationFrame(syncBookLayout);
+}
 
 const herResponse = { accepted: false, smile: "", note: "" };
 
-const TURN_HINT = '<p class="pg__turn-hint">Click to turn page</p>';
-
 function showTurnHint(page, side) {
-  if (side === "right") return TURN_HINT;
-  if (page.type === "chapter-story" && page.number === CHAPTERS.length) return TURN_HINT;
+  if (side === "right") return turnHintHtml();
+  if (page.type === "chapter-story" && page.number === CHAPTERS.length) return turnHintHtml();
   return "";
 }
-
 function blankPaper(side) {
   return `<div class="pg pg--paper-back pg--${side}"></div>`;
+}
+
+function pageShell(inner, side, mod = "") {
+  return `<div class="pg ${mod} pg--${side}"><div class="pg__inner">${inner}</div></div>`;
 }
 
 function renderPage(page, side) {
@@ -132,48 +244,74 @@ function renderPage(page, side) {
 
   switch (page.type) {
     case "intro":
-      return `<div class="pg pg--intro pg--${side}"><span class="pg__ico">☮</span><h2 class="pg__title">${page.title}</h2><p class="pg__text">${page.body}</p></div>`;
+      return pageShell(
+        `<span class="pg__ico">☮</span><h2 class="pg__title">${page.title}</h2><p class="pg__text">${page.body}</p>`,
+        side,
+        "pg--intro"
+      );
     case "chapter-start":
-      return `<div class="pg pg--ch-start pg--${side}"><p class="pg__ch">Chapter ${page.number}</p><h2 class="pg__title">${page.title}</h2><span class="pg__heart">♡</span>${showTurnHint(page, side)}</div>`;
+      return `<div class="pg pg--ch-start pg--${side}">
+        <div class="pg__inner">
+          <p class="pg__ch">Chapter ${page.number}</p>
+          <h2 class="pg__title">${page.title}</h2>
+          <span class="pg__heart">♡</span>
+        </div>
+        ${showTurnHint(page, side)}
+      </div>`;
     case "chapter-story":
       return `<div class="pg pg--ch-story pg--${side}">
-        <div class="pg__img-frame"><img class="pg__img" src="${page.image}" alt="Chapter ${page.number}" /></div>
-        <p class="pg__text">${page.story}</p>
+        <div class="pg__inner">
+          <div class="pg__img-frame"><img class="pg__img" src="${page.image}" alt="Chapter ${page.number}" loading="lazy" /></div>
+          <p class="pg__text">${page.story}</p>
+        </div>
         ${showTurnHint(page, side)}
       </div>`;
     case "finale":
-      return `<div class="pg pg--finale pg--${side}"><span class="pg__ico">☮</span><h2 class="pg__title">${page.title}</h2><p class="pg__text">${page.body}</p><p class="pg__sign">Always, ${snowyLink()}</p>${side === "right" ? TURN_HINT : ""}</div>`;
-    case "interactive":
+      return `<div class="pg pg--finale pg--${side}">
+        <div class="pg__inner">
+          <span class="pg__ico">☮</span>
+          <h2 class="pg__title">${page.title}</h2>
+          <p class="pg__text">${page.body}</p>
+          <p class="pg__sign">${page.signature || "Always,"} ${snowyLink()}</p>
+        </div>
+        ${side === "right" ? turnHintHtml() : ""}
+      </div>`;
+    case "interactive": {
+      const ix = CONTENT.interactive;
       return `<div class="pg pg--ix pg--${side}" data-ix="1">
-        <p class="pg__ch">A gentle ask</p>
-        <h2 class="pg__title">Your turn ♡</h2>
-        <div class="ix-block">
-          <button type="button" class="ix-btn ix-btn--accept" data-act="accept">Can you accept my apologies?</button>
-        </div>
-        <div class="ix-block">
-          <p class="ix-lbl">Did this bring a little smile?</p>
-          <div class="ix-smiles">
-            <button type="button" class="ix-smile" data-smile="yes">😊 Yes</button>
-            <button type="button" class="ix-smile" data-smile="little">🙂 A little</button>
-            <button type="button" class="ix-smile" data-smile="notyet">🌙 Not yet</button>
+        <div class="pg__inner">
+          <p class="pg__ch">${ix.label}</p>
+          <h2 class="pg__title">${ix.title}</h2>
+          <div class="ix-block">
+            <button type="button" class="ix-btn ix-btn--accept" data-act="accept">${ix.acceptButton}</button>
           </div>
+          <div class="ix-block">
+            <p class="ix-lbl">${ix.smileQuestion}</p>
+            <div class="ix-smiles">
+              <button type="button" class="ix-smile" data-smile="yes">${ix.smiles.yes}</button>
+              <button type="button" class="ix-smile" data-smile="little">${ix.smiles.little}</button>
+              <button type="button" class="ix-smile" data-smile="notyet">${ix.smiles.notyet}</button>
+            </div>
+          </div>
+          <div class="ix-block">
+            <label class="ix-lbl" for="ix-note">${ix.noteLabel} <em>${ix.noteOptional}</em></label>
+            <textarea id="ix-note" class="ix-note" rows="3" placeholder="${ix.notePlaceholder}"></textarea>
+          </div>
+          <div class="ix-block">
+            <p class="ix-msg" id="ix-msg" hidden></p>
+          </div>
+          <p class="ix-foot">${ix.footnote}</p>
         </div>
-        <div class="ix-block">
-          <label class="ix-lbl" for="ix-note">A note for me <em>(optional)</em></label>
-          <textarea id="ix-note" class="ix-note" rows="3" placeholder="Write anything you want to say…"></textarea>
-        </div>
-        <div class="ix-block">
-          <p class="ix-msg" id="ix-msg" hidden></p>
-        </div>
-        <p class="ix-foot">No pressure — only if you feel like it.</p>
       </div>`;
-    case "story-continue":
-      return `<div class="pg pg--continue pg--${side}">
-        <span class="pg__heart">♡</span>
-        <h2 class="pg__title">Story continues…</h2>
-        <p class="pg__text">Maybe one day we'll write the next chapter together — slowly, with peace and love.</p>
-        <p class="pg__sign">Always, ${snowyLink()}</p>
-      </div>`;
+    }
+    case "story-continue": {
+      const sc = CONTENT.storyContinue;
+      return pageShell(
+        `<span class="pg__heart">♡</span><h2 class="pg__title">${sc.title}</h2><p class="pg__text">${sc.body}</p><p class="pg__sign">${sc.signature || "Always,"} ${snowyLink()}</p>`,
+        side,
+        "pg--continue"
+      );
+    }
     default:
       return `<div class="pg pg--blank pg--${side}"></div>`;
   }
@@ -196,6 +334,7 @@ function paintSpread() {
   hideFlipper();
   updateTurnHints();
   bindInteractive();
+  scheduleBookLayout();
 }
 
 function isInteractiveSpread() {
@@ -231,13 +370,14 @@ function updateEndActions() {
     actionsOpen.style.display = "";
     actionsOpen.classList.remove("is-hide");
     actionsOpen.classList.add("is-visible-reading");
-    btnOpen.textContent = "Close & reopen book ♡";
+    btnOpen.textContent = CONTENT?.buttons?.closeBook || "Close & reopen book ♡";
     btnOpen.disabled = busy;
   } else if (isOpen) {
     actionsOpen.style.display = "none";
     actionsOpen.classList.remove("is-visible-reading");
     actionsOpen.classList.add("is-hide");
   }
+  scheduleBookLayout();
 }
 
 function resetBookState() {
@@ -350,10 +490,11 @@ async function submitAnswer(event, data, { closeOnSuccess = false } = {}) {
   if (responseSaving) return;
 
   responseSaving = true;
+  const ui = CONTENT?.ui || {};
   if (msg) {
     msg.hidden = false;
     msg.className = "ix-msg";
-    msg.textContent = "Saving…";
+    msg.textContent = ui.saving || "Saving…";
   }
 
   try {
@@ -361,16 +502,17 @@ async function submitAnswer(event, data, { closeOnSuccess = false } = {}) {
     const savedAt = result.time?.display || "just now";
     if (msg) {
       msg.className = "ix-msg ix-msg--ok";
-      msg.textContent = closeOnSuccess
-        ? `Thank you… saved at ${savedAt}. Closing with love ♡`
-        : `Saved at ${savedAt} ♡`;
+      const tpl = closeOnSuccess
+        ? (ui.thankYouClose || "Thank you… saved at {time}. Closing with love ♡")
+        : (ui.saved || "Saved at {time} ♡");
+      msg.textContent = tpl.replace("{time}", savedAt);
     }
     if (closeOnSuccess) setTimeout(closeBook, 2200);
   } catch (err) {
     if (msg) {
       msg.hidden = false;
       msg.className = "ix-msg ix-msg--err";
-      msg.textContent = err.message || "Could not save. On Vercel: add Blob storage in project Settings → Storage.";
+      msg.textContent = err.message || ui.saveError || "Could not save.";
     }
   } finally {
     responseSaving = false;
@@ -389,7 +531,7 @@ function bindInteractive() {
   panel.querySelector("[data-act=accept]")?.addEventListener("click", (e) => {
     e.stopPropagation();
     herResponse.accepted = true;
-    e.currentTarget.textContent = "Accepted ♡";
+    e.currentTarget.textContent = CONTENT?.interactive?.acceptDone || "Accepted ♡";
     e.currentTarget.classList.add("ix-btn--done");
     submitAnswer("accept_apology", { accepted: true });
   });
@@ -448,6 +590,7 @@ function openBook() {
     startMusic();
     trackEvent("book_opened").catch(() => {});
     busy = false;
+    scheduleBookLayout();
   }, 400);
 }
 
@@ -478,8 +621,9 @@ function closeBook() {
     readingBar?.setAttribute("aria-hidden", "true");
     isOpen = false;
     resetBookState();
-    btnOpen.textContent = "Open the book ♡";
+    btnOpen.textContent = CONTENT?.buttons?.openBook || "Open the book ♡";
     busy = false;
+    scheduleBookLayout();
   }, 500);
 }
 
@@ -493,7 +637,7 @@ function setupInstagramLinks() {
   const footerIg = document.getElementById("footer-ig");
   if (footerIg) {
     footerIg.href = igUrl();
-    footerIg.textContent = `@${SNOWY_IG}`;
+    footerIg.textContent = `@${igHandle()}`;
     footerIg.addEventListener("click", () => {
       trackEvent("instagram_click", { url: igUrl() }).catch(() => {});
     });
@@ -505,10 +649,23 @@ function setupInstagramLinks() {
   });
 }
 
+function isScrollablePage(el) {
+  const pg = el?.closest?.(".pg");
+  if (!pg) return false;
+  return pg.scrollHeight > pg.clientHeight + 4;
+}
+
+function markScrollablePages() {
+  document.querySelectorAll(".pg").forEach((pg) => {
+    pg.classList.toggle("pg--overflow", pg.scrollHeight > pg.clientHeight + 4);
+  });
+}
+
 function init() {
   book = document.getElementById("book");
   bookClosed = document.getElementById("book-closed");
   bookOpen = document.getElementById("book-open");
+  bookStage = document.getElementById("book-stage");
   actionsOpen = document.getElementById("actions-open");
   footer = document.getElementById("footer");
   btnOpen = document.getElementById("btn-open");
@@ -516,6 +673,9 @@ function init() {
   zoneNext = document.getElementById("zone-next");
   turnHints = document.getElementById("turn-hints");
   readingBar = document.getElementById("reading-bar");
+  btnSizeDown = document.getElementById("btn-size-down");
+  btnSizeUp = document.getElementById("btn-size-up");
+  bookSizeLabel = document.getElementById("book-size-label");
   layerLeft = document.getElementById("layer-left");
   layerRight = document.getElementById("layer-right");
   underLeft = document.getElementById("under-left");
@@ -529,6 +689,14 @@ function init() {
 
   setupInstagramLinks();
   trackLinkOpenedOnce();
+
+  bookScale = readStoredBookScale();
+  applyBookScale();
+  window.addEventListener("resize", scheduleBookLayout, { passive: true });
+  window.visualViewport?.addEventListener("resize", scheduleBookLayout, { passive: true });
+
+  btnSizeDown?.addEventListener("click", () => changeBookScale(-BOOK_SCALE_STEP));
+  btnSizeUp?.addEventListener("click", () => changeBookScale(BOOK_SCALE_STEP));
 
   musicBtn.addEventListener("click", () => {
     musicOn = !musicOn;
@@ -584,6 +752,9 @@ function init() {
     const dx = Math.abs(e.touches[0].clientX - touchX);
     const dy = Math.abs(e.touches[0].clientY - touchY);
     if (dx > 8 || dy > 8) touchMoved = true;
+    if (isScrollablePage(e.target) && dy > dx) {
+      e.stopPropagation();
+    }
   }, { passive: true });
 
   bookOpen.addEventListener("touchend", (e) => {
@@ -592,6 +763,9 @@ function init() {
 
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchX;
+    const dy = touch.clientY - touchY;
+
+    if (isScrollablePage(e.target) && (touchMoved || Math.abs(dy) > Math.abs(dx))) return;
 
     if (e.target.closest(".turn-zone")) {
       if (!touchMoved) {
@@ -619,7 +793,21 @@ function init() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", bootstrap);
 } else {
-  init();
+  bootstrap();
+}
+
+async function bootstrap() {
+  try {
+    await loadContent();
+    applyContentToPage();
+    init();
+  } catch (err) {
+    console.error(err);
+    const hero = document.getElementById("hero");
+    if (hero) {
+      hero.insertAdjacentHTML("beforeend", `<p class="hero__hint" style="color:#ffb4b4">Could not load content.json — check the file exists.</p>`);
+    }
+  }
 }
